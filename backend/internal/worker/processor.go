@@ -75,7 +75,7 @@ func (p *Processor) HandleProcessCSVTask(ctx context.Context, t *asynq.Task) err
 		errorMsg := fmt.Sprintf("Failed to create output dir: %v", err)
 		p.jobRepo.UpdateStatusWithError(jobID, "failed", errorMsg)
 		os.Remove(payload.FilePath)
-		return fmt.Errorf(errorMsg)
+		return fmt.Errorf("%s", errorMsg)
 	}
 
 	outputPath, err := csvProcessor.GenerateOutputFile(outputDir)
@@ -83,7 +83,7 @@ func (p *Processor) HandleProcessCSVTask(ctx context.Context, t *asynq.Task) err
 		errorMsg := fmt.Sprintf("Failed to generate output file: %v", err)
 		p.jobRepo.UpdateStatusWithError(jobID, "failed", errorMsg)
 		os.Remove(payload.FilePath)
-		return fmt.Errorf(errorMsg)
+		return fmt.Errorf("%s", errorMsg)
 	}
 
 	// Save output path and final stats
