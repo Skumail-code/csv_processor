@@ -1,0 +1,90 @@
+services:
+  postgres:
+    image: postgres:18  
+    container_name: csv-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: csv_jobs
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d csv_jobs"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:8  
+    container_name: csv-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    build: .
+    container_name: csv-app
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: csv_jobs
+      DB_SSLMODE: disable
+      DB_MAX_OPEN_CONNS: 25
+      DB_MAX_IDLE_CONNS: 25
+      DB_CONN_MAX_LIFETIME: 5m
+      SERVER_PORT: 8080
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      REDIS_ADDR: redis:6379
+    volumes:
+      - uploads_data:/tmp/uploads
+      - processed_data:/tmp/processed
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: csv-worker
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: csv_jobs
+      DB_SSLMODE: disable
+      REDIS_ADDR: redis:6379
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    volumes:
+      - uploads_data:/tmp/uploads
+      - processed_data:/tmp/processed
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  uploads_data:
+  processed_data:
+  postgres_data:
+  redis_data:
