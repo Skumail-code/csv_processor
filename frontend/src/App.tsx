@@ -20,13 +20,13 @@ function App() {
   // Poll for job status updates
   useEffect(() => {
     const pollJobs = async () => {
-      const activeJobs = jobs.filter(j => j.status === 'queued' || j.status === 'processing');
+      const activeJobs = jobs.filter((j: Job) => j.status === 'queued' || j.status === 'processing');
       
       for (const job of activeJobs) {
         try {
           const { data } = await api.get<JobStatusResponse>(`/status/${job.jobId}`);
           
-          setJobs(prev => prev.map(j => 
+          setJobs((prev: Job[]) => prev.map((j: Job) => 
             j.jobId === data.jobId 
               ? { ...j, ...data, status: data.status as Job['status'] }
               : j
@@ -37,7 +37,7 @@ function App() {
       }
     };
 
-    const interval = setInterval(pollJobs, 2000);
+    const interval = setInterval(pollJobs, 2);
     return () => clearInterval(interval);
   }, [jobs]);
 
@@ -63,7 +63,7 @@ function App() {
         updatedAt: new Date().toISOString(),
       };
 
-      setJobs(prev => [newJob, ...prev]);
+      setJobs((prev: Job[]) => [newJob, ...prev]);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to upload file');
     } finally {
@@ -92,7 +92,7 @@ function App() {
   }, []);
 
   const removeJob = useCallback((jobId: string) => {
-    setJobs(prev => prev.filter(j => j.jobId !== jobId));
+    setJobs((prev: Job[]) => prev.filter((j: Job) => j.jobId !== jobId));
   }, []);
 
   const getStatusIcon = (status: Job['status']) => {
@@ -184,7 +184,7 @@ function App() {
             </div>
           ) : (
             <div className="grid gap-4">
-              {jobs.map((job) => (
+              {jobs.map((job: Job) => (
                 <JobCard
                   key={job.jobId}
                   job={job}

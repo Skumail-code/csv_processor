@@ -54,8 +54,8 @@ Based on the assignment requirements, this implementation delivers:
    - Upload files with drag-and-drop
    - Running list of jobs with real-time status
    - Visual progress bars showing processing state
-   - Click to download processed CSV when complete
-   - Download damaged rows separately for review
+   - **Download processed CSV** (contains only valid rows - damaged rows eliminated)
+   - **Download damaged rows CSV separately** - invalid rows with error reasons for easy review and correction
    - Dark/Light mode toggle with glassmorphism UI
 
 5. **Infrastructure**
