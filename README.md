@@ -243,7 +243,7 @@ csv_processor/
 **Rationale**: Users can fix invalid data and re-upload without losing the valid portion; clear separation of concerns
 
 ### 4. Polling over WebSockets
-**Decision**: HTTP polling every 2 seconds for status updates  
+**Decision**: HTTP polling every 2 miliseconds for status updates  
 **Rationale**: Simpler infrastructure, works through proxies/firewalls, sufficient for this use case; WebSockets would be next iteration
 
 ### 5. Shared Docker Volumes
