@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:18  
+    image: postgres:16
     container_name: csv-postgres
     environment:
       POSTGRES_USER: postgres
@@ -9,7 +9,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d csv_jobs"]
       interval: 5s
@@ -18,7 +18,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:8  
+    image: redis:7-alpine
     container_name: csv-redis
     ports:
       - "6379:6379"
@@ -31,9 +31,11 @@ services:
       retries: 5
     restart: unless-stopped
 
-  app:
-    build: .
-    container_name: csv-app
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: csv-api
     ports:
       - "8080:8080"
     environment:
@@ -61,7 +63,7 @@ services:
 
   worker:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile.worker
     container_name: csv-worker
     environment:
@@ -81,6 +83,17 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: csv-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
     restart: unless-stopped
 
 volumes:
