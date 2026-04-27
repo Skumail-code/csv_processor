@@ -71,6 +71,15 @@ Based on the assignment requirements, this implementation delivers:
 - **File persistence**: Shared Docker volumes ensure API and worker can access files
 - **Queue failures**: Redis persistence + job status tracking in PostgreSQL
 
+### Future Improvements
+
+If I had more time, I would harden the row-validation logic further and make the error handling more exhaustive.
+
+- Tighten validation rules for every field combination and edge case
+- Add more test coverage for malformed CSV inputs and tricky row values
+- Make validation rules schema-driven instead of hard-coded
+- Add clearer reporting for rows that fail multiple validation checks
+
 ## High-Level Architecture
 
 ```
