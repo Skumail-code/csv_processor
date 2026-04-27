@@ -6,10 +6,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var invalidDescriptionPattern = regexp.MustCompile(`(?i)(INVALID_DATE_HERE|PLACEHOLDER|TEST)`)
 
 type Transaction struct {
 	ID          int
@@ -152,6 +155,13 @@ func (p *CSVProcessor) processRow(rowNum int, record []string) *Transaction {
 		return trans
 	}
 
+	// Validate description for specific placeholder/invalid text
+	if invalidDescriptionPattern.MatchString(trans.Description) {
+		trans.IsValid = false
+		trans.ErrorMsg = fmt.Sprintf("invalid description: '%s' is not a valid description", trans.Description)
+		return trans
+	}
+
 	// Parse Amount (handle Indian Rupee symbol)
 	amountStr := strings.TrimSpace(record[3])
 	amountStr = strings.ReplaceAll(amountStr, "₹", "")
@@ -159,7 +169,7 @@ func (p *CSVProcessor) processRow(rowNum int, record []string) *Transaction {
 	amount, err := strconv.ParseFloat(amountStr, 64)
 	if err != nil {
 		trans.IsValid = false
-		trans.ErrorMsg = fmt.Sprintf("invalid amount: %v", err)
+		trans.ErrorMsg = fmt.Sprintf("invalid amount: '%s' is not a valid number", amountStr)
 		return trans
 	}
 	trans.Amount = amount
