@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,22 +13,28 @@ import (
 	"time"
 )
 
-var invalidDescriptionPattern = regexp.MustCompile(`(?i)(INVALID_DATE_HERE|PLACEHOLDER|TEST)`)
+var invalidDescriptionPattern = regexp.MustCompile(`(?i)(INVALID_DATE_HERE|PLACEHOLDER|TEST|NULL)`)
 
 type Transaction struct {
-	ID          int
-	Date        time.Time
-	Description string
-	Amount      float64
-	Category    string
-	IsValid     bool
-	ErrorMsg    string
+	ID             int
+	Date           time.Time
+	RawID          string
+	RawDate        string
+	RawDescription string
+	RawAmount      string
+	RawCategory    string
+	Description    string
+	Amount         float64
+	Category       string
+	IsValid        bool
+	ErrorMsg       string
 }
 
 type CSVProcessor struct {
 	FilePath      string
 	ValidRows     []Transaction
 	InvalidRows   []Transaction
+	AllRows       []Transaction
 	TotalRows     int
 	ProcessedRows int
 }
@@ -37,6 +44,7 @@ func NewCSVProcessor(filePath string) *CSVProcessor {
 		FilePath:    filePath,
 		ValidRows:   make([]Transaction, 0),
 		InvalidRows: make([]Transaction, 0),
+		AllRows:     make([]Transaction, 0),
 	}
 }
 
@@ -83,6 +91,7 @@ func (p *CSVProcessor) Process(onProgress func(processed, valid, invalid int)) e
 		} else {
 			p.InvalidRows = append(p.InvalidRows, *transaction)
 		}
+		p.AllRows = append(p.AllRows, *transaction)
 
 		p.ProcessedRows = rowIndex
 		rowIndex++
@@ -121,10 +130,23 @@ func (p *CSVProcessor) processRow(rowNum int, record []string) *Transaction {
 		IsValid: true,
 	}
 
+	if len(record) >= 5 {
+		trans.RawID = record[0]
+		trans.RawDate = record[1]
+		trans.RawDescription = record[2]
+		trans.RawAmount = record[3]
+		trans.RawCategory = record[4]
+	}
+
 	// Check column count
 	if len(record) < 5 {
 		trans.IsValid = false
 		trans.ErrorMsg = fmt.Sprintf("expected 5 columns, got %d", len(record))
+		return trans
+	}
+	if len(record) > 5 {
+		trans.IsValid = false
+		trans.ErrorMsg = fmt.Sprintf("expected 5 columns, got %d (extra columns are not allowed)", len(record))
 		return trans
 	}
 
@@ -149,6 +171,17 @@ func (p *CSVProcessor) processRow(rowNum int, record []string) *Transaction {
 
 	// Parse Description
 	trans.Description = strings.TrimSpace(record[2])
+	amountStr := strings.TrimSpace(record[3])
+	amountStr = strings.ReplaceAll(amountStr, "₹", "")
+	amountStr = strings.ReplaceAll(amountStr, ",", "")
+	trans.Category = strings.TrimSpace(record[4])
+
+	if trans.Description == "" && amountStr == "" && trans.Category == "" {
+		trans.IsValid = false
+		trans.ErrorMsg = "description, amount, and category cannot be empty"
+		return trans
+	}
+
 	if trans.Description == "" {
 		trans.IsValid = false
 		trans.ErrorMsg = "description cannot be empty"
@@ -163,22 +196,38 @@ func (p *CSVProcessor) processRow(rowNum int, record []string) *Transaction {
 	}
 
 	// Parse Amount (handle Indian Rupee symbol)
-	amountStr := strings.TrimSpace(record[3])
-	amountStr = strings.ReplaceAll(amountStr, "₹", "")
-	amountStr = strings.ReplaceAll(amountStr, ",", "")
+	if amountStr == "" {
+		trans.IsValid = false
+		trans.ErrorMsg = "amount cannot be empty"
+		return trans
+	}
 	amount, err := strconv.ParseFloat(amountStr, 64)
 	if err != nil {
 		trans.IsValid = false
-		trans.ErrorMsg = fmt.Sprintf("invalid amount: '%s' is not a valid number", amountStr)
+		trans.ErrorMsg = fmt.Sprintf("invalid amount: '%s' must be numeric", amountStr)
+		return trans
+	}
+	if amount == 0 {
+		trans.IsValid = false
+		trans.ErrorMsg = fmt.Sprintf("invalid amount: '%s' cannot be 0", amountStr)
+		return trans
+	}
+	if amount > 0 && amount == math.Trunc(amount) && !strings.EqualFold(trans.Category, "Income") {
+		trans.IsValid = false
+		trans.ErrorMsg = fmt.Sprintf("invalid amount: '%s' positive integer amounts are only allowed for category 'Income'", amountStr)
 		return trans
 	}
 	trans.Amount = amount
 
 	// Parse Category
-	trans.Category = strings.TrimSpace(record[4])
 	if trans.Category == "" {
 		trans.IsValid = false
 		trans.ErrorMsg = "category cannot be empty"
+		return trans
+	}
+	if _, err := strconv.Atoi(trans.Category); err == nil {
+		trans.IsValid = false
+		trans.ErrorMsg = fmt.Sprintf("invalid category: '%s' cannot be an integer", trans.Category)
 		return trans
 	}
 
@@ -192,6 +241,7 @@ func (p *CSVProcessor) addInvalidRow(rowNum int, errMsg string) {
 		ErrorMsg: errMsg,
 	}
 	p.InvalidRows = append(p.InvalidRows, *trans)
+	p.AllRows = append(p.AllRows, *trans)
 }
 
 func (p *CSVProcessor) GenerateOutputFile(outputDir string) (string, error) {
@@ -215,35 +265,26 @@ func (p *CSVProcessor) GenerateOutputFile(outputDir string) (string, error) {
 		return "", fmt.Errorf("failed to write headers: %w", err)
 	}
 
-	// Write valid rows with "VALID" status
-	for _, row := range p.ValidRows {
-		record := []string{
-			strconv.Itoa(row.ID),
-			row.Date.Format("2006-01-02"),
-			row.Description,
-			strconv.FormatFloat(row.Amount, 'f', 2, 64),
-			row.Category,
-			"VALID",
-			"",
+	// Write rows in original input order while marking validity per row.
+	for _, row := range p.AllRows {
+		status := "VALID"
+		errorMsg := ""
+		if !row.IsValid {
+			status = "INVALID"
+			errorMsg = row.ErrorMsg
 		}
-		if err := writer.Write(record); err != nil {
-			return "", fmt.Errorf("failed to write valid row: %w", err)
-		}
-	}
 
-	// Write invalid rows with error messages
-	for _, row := range p.InvalidRows {
 		record := []string{
-			strconv.Itoa(row.ID),
-			"", // Date may be invalid
-			row.Description,
-			"0",
-			"",
-			"INVALID",
-			row.ErrorMsg,
+			row.RawID,
+			row.RawDate,
+			row.RawDescription,
+			row.RawAmount,
+			row.RawCategory,
+			status,
+			errorMsg,
 		}
 		if err := writer.Write(record); err != nil {
-			return "", fmt.Errorf("failed to write invalid row: %w", err)
+			return "", fmt.Errorf("failed to write row: %w", err)
 		}
 	}
 
