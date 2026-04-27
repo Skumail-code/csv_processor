@@ -171,16 +171,7 @@ Expected columns (in order):
 2. `date` - Date in YYYY-MM-DD format
 3. `description` - Non-empty string
 4. `amount` - Numeric value (supports ₹ symbol and commas)
-5. `category` - Must be one of:
-   - Income
-   - Food & Dining
-   - Transport
-   - Groceries
-   - Entertainment
-   - Transfer
-   - Shopping
-   - Donation
-   - Finance
+5. `category` - Non-empty string (any category value accepted)
 
 ## Project Structure
 

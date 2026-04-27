@@ -166,14 +166,9 @@ func (p *CSVProcessor) processRow(rowNum int, record []string) *Transaction {
 
 	// Parse Category
 	trans.Category = strings.TrimSpace(record[4])
-	validCategories := map[string]bool{
-		"Income": true, "Food & Dining": true, "Transport": true,
-		"Groceries": true, "Entertainment": true, "Transfer": true,
-		"Shopping": true, "Donation": true, "Finance": true,
-	}
-	if !validCategories[trans.Category] {
+	if trans.Category == "" {
 		trans.IsValid = false
-		trans.ErrorMsg = fmt.Sprintf("invalid category: %s", trans.Category)
+		trans.ErrorMsg = "category cannot be empty"
 		return trans
 	}
 
