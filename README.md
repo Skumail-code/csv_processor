@@ -242,9 +242,9 @@ csv_processor/
 **Decision**: Generate two output files (valid + invalid rows)  
 **Rationale**: Users can fix invalid data and re-upload without losing the valid portion; clear separation of concerns
 
-### 4. Polling over WebSockets
+### 4. Polling over Websockets
 **Decision**: HTTP polling every 2 miliseconds for status updates  
-**Rationale**: Simpler infrastructure, works through proxies/firewalls, sufficient for this use case; WebSockets would be next iteration
+**Rationale**: Simpler infrastructure, works through proxies/firewalls, sufficient for this use case.
 
 ### 5. Shared Docker Volumes
 **Decision**: API and workers share `/tmp/uploads` and `/tmp/processed`  
